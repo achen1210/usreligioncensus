@@ -1055,6 +1055,9 @@ for col in main2020.columns:
 
 filteredmain_adherents = main[filteredcolumns]
 
+
+#### Entire US
+
 years = [1971, 1980, 1990, 2000, 2010, 2020]
 summed = defaultdict(list)
 summed["Year"] = years
@@ -1069,8 +1072,9 @@ summed_y = [x for x in summed]
 summed_y.remove("Year")
 summed_y.remove("Total Population")
 
-ax = main.plot(x = "Year", y = summed_y, title = "Denominations in USA " + \
-               "with over " + str(format(FILTERNUM, ',d')) + "Adherents in 2020"\
+### Normal Plot
+ax = summed_df.plot(x = "Year", y = summed_y, title = "Denominations in USA " + \
+               "with over " + str(format(FILTERNUM, ',d')) + " Adherents in 2020"\
                         , grid = True, ylabel = "Adherents", figsize = (20,8),\
                         marker = ".", table = True)
 ax.xaxis.set_label_position('top') 
@@ -1080,73 +1084,37 @@ plt.ticklabel_format(style='plain')
 current_values = plt.gca().get_yticks()
 plt.gca().set_yticklabels(['{:,.0f}'.format(x) for x in current_values])
 #table(ax, np.round(statesubframe[tograph].describe(), 2),loc='upper right')
-plt.savefig("stateoutputs/US/" + "USA" + '_Top' + str(FILTERNUM) +'Religions_total.png',\
+plt.savefig("stateoutputs/US/" + "USA" + '_Over' +\
+            str(FILTERNUM) +'_in2020_Religions_total.png',\
             bbox_inches='tight', dpi=150)
 plt.show()
 
 
-#### Entire US
-# ### by average
-# heapsum = []
-
-# for col in main.columns:
-#     if col in adherents:
-        
-#         #note: heap is minheap by default in python,
-#         #so we take negative of each element for maxheap
-#         #python automatically compares by first element of tuple
-#         if len(heapsum) >= NUMBERTOSHOW:
-#             heapq.heappushpop(heapsum, (main[col].mean(), col))
-        
-#         else:
-#             heapq.heappush(heapsum, (main[col].mean(), col))
-
-# ## normal plot
-# tograph = [col for _, col in heapsum]
-# ax = main.plot(x = "Year", y = tograph, title = "Top " + str(NUMBERTOSHOW)\
-#                     +" Denominations in USA by Average Number of Adherents"\
-#                         , grid = True, ylabel = "Adherents", figsize = (20,8),\
-#                         marker = ".", table = True)
-# ax.xaxis.set_label_position('top') 
-# ax.xaxis.tick_top()
-# plt.ticklabel_format(style='plain') 
-# #from https://queirozf.com/entries/matplotlib-examples-number-formatting-for-axes-labels#:~:text=Comma%20as%20thousands%20separator%20Formatting%20labels%20must%20only,with.set_yticklabels%20%28%29%20%28similar%20methods%20exist%20for%20X-axis%20too%29%3A
-# current_values = plt.gca().get_yticks()
-# plt.gca().set_yticklabels(['{:,.0f}'.format(x) for x in current_values])
-# #table(ax, np.round(statesubframe[tograph].describe(), 2),loc='upper right')
-# plt.savefig("stateoutputs/US/" + "USA" + '_Top' + str(NUMBERTOSHOW) +'Religions_avg.png',\
-#             bbox_inches='tight', dpi=150)
-# plt.show()
-
 # ## percentage plot
-# tograph = [col for _, col in heapsum]
-# tograph.append("Year")
-# tograph.append("Total Population")
-# ssf_pct = main[tograph]
-
-# pct_tograph = []
-# for col in ssf_pct.columns:
-#     ssf_pct[col + "_pct"] = ssf_pct[col] / ssf_pct["Total Population"]
-#     pct_tograph.append(col + "_pct")
-# pct_tograph.remove("Total Population_pct")
-# pct_tograph.remove("Year_pct")
-# ax = ssf_pct.plot(x = "Year", y = pct_tograph, title = "Top " + str(NUMBERTOSHOW)\
-#                     +" Denominations in " + "USA" + " by Average Number of Adherents,"+\
-#                         " as a Percentage of Total Population of " + "USA"\
-#                         , grid = True, ylabel = "Adherents as % of State Population",\
-#                             figsize = (20,8),\
-#                         marker = ".", table = True)
-# ax.xaxis.set_label_position('top') 
-# ax.xaxis.tick_top()
-# plt.ticklabel_format(style='plain') 
-# #from https://queirozf.com/entries/matplotlib-examples-number-formatting-for-axes-labels#:~:text=Comma%20as%20thousands%20separator%20Formatting%20labels%20must%20only,with.set_yticklabels%20%28%29%20%28similar%20methods%20exist%20for%20X-axis%20too%29%3A
-# current_values = plt.gca().get_yticks()
-# plt.gca().set_yticklabels(['{:,.0%}'.format(x) for x in current_values])
-# #table(ax, np.round(statesubframe[tograph].describe(), 2),loc='upper right')
-# plt.savefig("stateoutputs/US/" + "USA" + '_Top' + str(NUMBERTOSHOW) +\
-#             'Religions_acg_pct.png',\
-#             bbox_inches='tight', dpi=150)
-# plt.show()
+pct_tograph = []
+for col in summed_df.columns:
+    summed_df[col + "_pct"] = summed_df[col] / summed_df["Total Population"]
+    pct_tograph.append(col + "_pct")
+pct_tograph.remove("Total Population_pct")
+pct_tograph.remove("Year_pct")
+ax = summed_df.plot(x = "Year", y = pct_tograph, title = " Denominations in " \
+                    + "USA" + " with over " + str(format(FILTERNUM, ',d')) +\
+                        " Adherents in 2020,"+\
+                        " as a Percentage of Total Population of " + "USA"\
+                        , grid = True, ylabel = "Adherents as % of USA Population",\
+                            figsize = (20,8),\
+                        marker = ".", table = True)
+ax.xaxis.set_label_position('top') 
+ax.xaxis.tick_top()
+plt.ticklabel_format(style='plain') 
+#from https://queirozf.com/entries/matplotlib-examples-number-formatting-for-axes-labels#:~:text=Comma%20as%20thousands%20separator%20Formatting%20labels%20must%20only,with.set_yticklabels%20%28%29%20%28similar%20methods%20exist%20for%20X-axis%20too%29%3A
+current_values = plt.gca().get_yticks()
+plt.gca().set_yticklabels(['{:,.0%}'.format(x) for x in current_values])
+#table(ax, np.round(statesubframe[tograph].describe(), 2),loc='upper right')
+plt.savefig("stateoutputs/US/" + "USA" + '_Over' + str(FILTERNUM) \
+            +'_in2020_Religions_total_pct.png',\
+            bbox_inches='tight', dpi=150)
+plt.show()
     
     
 
