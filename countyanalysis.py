@@ -27,8 +27,8 @@ subfoldername = "countydata"
 
 ##Note: 1952 data does not have adherents! Have commented out, but
 ##can add back in by putting it back in "todo_list1" below
-data52 = pd.read_stata(subfoldername + '/'+ '1952.dta')
-data52.name = '1952'
+#data52 = pd.read_stata(subfoldername + '/'+ '1952.dta')
+#data52.name = '1952'
 #labels52iterator = pd.read_stata('1952.dta', iterator = True)
 #labels52 = labels52iterator.variable_labels()
 
@@ -90,8 +90,8 @@ data2020.rename(columns = newnames2020, inplace = True)
 # Not sure how to do it in one line so here's a bodge job
 # Usual setting method causes Dataframe fragmentation error,
 #e.g. directly using data52["Year"] = 1952 -> fragmented dataframe
-year52 = data52[['stcode']].copy()
-year52.columns = ["Year"]
+#year52 = data52[['stcode']].copy()
+#year52.columns = ["Year"]
 year71 = data71[['name']].copy()
 year71.columns = ["Year"]
 year80 = data80[['state']].copy()
@@ -105,7 +105,7 @@ year2010.columns = ["Year"]
 year2020 = data2020[['State Name']].copy()
 year2020.columns = ["Year"]
 
-year52["Year"] = 1952
+#year52["Year"] = 1952
 year71["Year"] = 1971
 year80["Year"] = 1980
 year90["Year"] = 1990
@@ -113,7 +113,7 @@ year2000["Year"] = 2000
 year2010["Year"] = 2010
 year2020["Year"] = 2020
 
-data52 = pd.concat((data52,year52),axis=1)
+#data52 = pd.concat((data52,year52),axis=1)
 data71 = pd.concat((data71,year71),axis=1)
 data80 = pd.concat((data80,year80),axis=1)
 data90 = pd.concat((data90,year90),axis=1)
@@ -613,8 +613,9 @@ identifiercols.add("State Name")
 identifiercols.add("State Abbreviation")
 identifiercols.add("State Code")
 identifiercols.add("County Name")
-identifiercols.add("Fips Code")
+#identifiercols.add("Fips Code")
 identifiercols.add("County Code")
+identifiercols.add("StandardCountyName")
 
 for label in cleanedlabels:
     x = label[-len("_a"):]
@@ -1165,6 +1166,9 @@ print("-------------------------------------------------------------")
 
 #concat all clean dataframes to make the main dataframe    
 main = pd.concat(dataframes, axis = 0, ignore_index = True)
+
+#replace zeros with nan so that it doesn't think a huge increase is from missing data
+main = main.replace({'0':np.nan, 0:np.nan})
 
 #Converts all states to capital case
 main["State Name"] = main["State Name"].str.title()
@@ -4379,10 +4383,11 @@ standardcountynames = {}
 for code in standardcountytuples:
     standardcountynames[code] = standardcountytuples[code][0]
 
-copy = pd.DataFrame().assign(StandardCountyName = main['Fips Code'])
-copy.StandardCountyName.replace(to_replace = standardcountynames, inplace = True)
-main = pd.concat([copy, main], axis = 0, ignore_index = True)
+print("Passed Stage 0")
+main['Fips Code'].replace(to_replace = standardcountynames, inplace = True)
+main.rename(columns={ 'Fips Code':'StandardCountyName'}, inplace = True)
 
+print("Passed Stage 1")
 
 # #outputs cleaned data to Excel
 #main.to_excel("COUNTYcleanedstatedata_1971_to_2020.xlsx")
@@ -4391,8 +4396,41 @@ years = [1971, 1980, 1990, 2000, 2010, 2020]
 
 USstates = set()
 #get states
+for code in statecodes:
+    USstates.add(statecodes[code]["name"])
+USstates.add("District Of Columbia")
+
+
+#Some states are not named correctly in 1971, i.e. Mass, Connect, this changes it
+statereplacement1971 = {
+    'Massachu' : 'Massachusetts',
+    'New Mex' : 'New Mexico',
+    'North Car' : 'North Carolina',
+    'Pennslyvania' : 'Pennsylvania',
+    'Connect' : 'Connecticut',
+    'Mississ' : 'Mississippi',
+    'Dc' : 'District Of Columbia',
+    'West Virg' : 'West Virginia',
+    'New Jers' : 'New Jersey',
+    'South Car' : 'South Carolina',
+    'Pennsyl' : 'Pennsylvania',
+    'Rhode Isl' : 'Rhode Island',
+    'South Dak' : 'South Dakota',
+    'New Hamp' : 'New Hampshire',
+    'North Dak' : 'North Dakota',
+    }
+
+main["State Name"].replace(to_replace = statereplacement1971, inplace = True)
+
+
+
+
+badstates = set()
 for i in range(len(main)):
-    USstates.add(main.loc[i,"State Name"])
+    badstates.add(main.loc[i,"State Name"])  
+badstates = badstates - USstates
+
+
     
 adherents = set()
 members = set()
@@ -4428,8 +4466,9 @@ adherents.add("Catholic Church_a")
 adherents.add("Muslim Estimate_a")
 adherents.add("Jewish Estimate_a")
 
-MINCONGREGATIONSIZE = 10000
-PERCENTAGEGROWTH = .5
+MINCONGREGATIONSIZE = 500000
+PERCENTAGEGROWTH = 1
+MINSIZEPERCOUNTY = 20000
 ###Filter out so only denominations of certain size in 2020
 
 
@@ -4439,6 +4478,7 @@ for col in main2020.columns:
     tempcol = main2020[col]
     if col in adherents and tempcol.sum() > MINCONGREGATIONSIZE:
         filteredcolumns.append(col)
+        
 
 #uncomment here, and comment out code in the note, if only want 2020
 # filteredmain_adherents = main[filteredcolumns]
@@ -4452,39 +4492,74 @@ for year in years[:-1]:
         tempcol = temp[col]
         if col in adherents and tempcol.sum() > MINCONGREGATIONSIZE:
             otherbigdenoms.add(col)
+                
+####Below is a work in progress - runtime is really bad
+# filteredcolumns = [col for col in identifiercols]
+# main2020 = main.loc[main["Year"] == 2020]
+# for code in standardcountynames:
+#     currcounty = main2020.loc[main2020["StandardCountyName"] == standardcountynames[code]]
+#     for col in currcounty.columns:
+#         tempcol = currcounty[col]
+#         if col in adherents and tempcol.sum() > MINCONGREGATIONSIZE:
+#             filteredcolumns.append(col)
+            
+
+# #uncomment here, and comment out code in the note, if only want 2020
+# # filteredmain_adherents = main[filteredcolumns]
+
+# ## NOTE: This may filter out a large denomination if their data is missing from
+# ## 2020, but present in all other years. Check for that here
+# otherbigdenoms = set()
+# for year in years[:-1]:
+#     temp = main.loc[main["Year"] == year]
+#     for code in standardcountynames:
+#         currcounty = main2020.loc[main2020["StandardCountyName"] == standardcountynames[code]]
+#         for col in currcounty.columns:
+#             tempcol = currcounty[col]
+#             if col in adherents and tempcol.sum() > MINCONGREGATIONSIZE:
+#                 otherbigdenoms.add(col)
+                
 
 leftout = otherbigdenoms - set(filteredcolumns)
 
 filteredmain_adherents = main[[x for x in leftout.union(set(filteredcolumns))]]
 
+print("Passed Stage 2")
+
 #fgc = fast growing counties
-fgc_statekey = defaultdict(list)
+#fgc_statekey = defaultdict(list)
 fgc_countystatetuplekey = defaultdict(list)
+statesubframe = filteredmain_adherents.loc[filteredmain_adherents["State Name"] == "Alabama"]
+currstate = "Alabama"
 for code in standardcountynames:
-    thiscounty = main.loc[main["Fips Code"] == code]
+    state = standardcountytuples[code][1]
+    if state != currstate:
+        statesubframe = filteredmain_adherents.loc[filteredmain_adherents["State Name"] == state]
+        currstate = state
     countyname = standardcountynames[code]
-    for col in thiscounty.columns:
-        if col not in identifiercols:
-            for val in thiscounty[col].pct_change():
+    thiscounty = statesubframe.loc[statesubframe["StandardCountyName"] == countyname]
+    for congregname in thiscounty.columns:
+        if congregname not in identifiercols and thiscounty[    congregname].sum() > MINSIZEPERCOUNTY:
+            for val in thiscounty[congregname].pct_change():
                 if val >= PERCENTAGEGROWTH:
-                    state = standardcountytuples[code][1]
-                    congregname = col
-                    county = countyname
-                    fgc_statekey[state].append((congregname, county))
-                    fgc_countystatetuplekey[(state, county)].append(congregname)
+                    #fgc_statekey[state].append((congregname, countyname))
+                    fgc_countystatetuplekey[(state, countyname)].append(congregname)
                     break
 
+print("Passed Stage 3")
 
 ################## GRAPHS ################
 
-# for state in USstates:
-#     ### State with County Names
-#     statesubframe = main.loc[main["State Name"] == state]
-#     tograph = []
-        
+for state in USstates:
+    ### State with County Names
+    statesubframe = filteredmain_adherents.loc[filteredmain_adherents["State Name"] == state]
+    tograph = []
+    
+
+#     #### ERRORS - NEED TO DEEP COPY DATAFRAME    
 #     for congreg, county in fgc_statekey[state]:
 #         statesubframe.rename(columns = {congreg : elimEnding(congreg) +", " + county},\
-#                              inplace = True)
+#                               inplace = True)
 #         tograph.append(elimEnding(congreg) +", " + county)
 
     
@@ -4501,8 +4576,6 @@ for code in standardcountynames:
 #     #from https://queirozf.com/entries/matplotlib-examples-number-formatting-for-axes-labels#:~:text=Comma%20as%20thousands%20separator%20Formatting%20labels%20must%20only,with.set_yticklabels%20%28%29%20%28similar%20methods%20exist%20for%20X-axis%20too%29%3A
 #     current_values = plt.gca().get_yticks()
 #     plt.gca().set_yticklabels(['{:,.0f}'.format(x) for x in current_values])
-#     #plt.legend(loc = "center left")
-#     #table(ax, np.round(statesubframe[tograph].describe(), 2),loc='upper right')
 #     plt.savefig("countyoutputs/by_each_state/" + state + '_IncreaseOf' +\
 #                 str(PERCENTAGEGROWTH * 100) + 'percent.png',\
 #                 bbox_inches='tight', dpi=150)
@@ -4533,75 +4606,83 @@ for code in standardcountynames:
 #     #from https://queirozf.com/entries/matplotlib-examples-number-formatting-for-axes-labels#:~:text=Comma%20as%20thousands%20separator%20Formatting%20labels%20must%20only,with.set_yticklabels%20%28%29%20%28similar%20methods%20exist%20for%20X-axis%20too%29%3A
 #     current_values = plt.gca().get_yticks()
 #     plt.gca().set_yticklabels(['{:,.0%}'.format(x) for x in current_values])
-#     #table(ax, np.round(statesubframe[tograph].describe(), 2),loc='upper right')
 #     plt.savefig("countyoutputs/by_each_state/" + state + '_IncreaseOf' +\
 #                 str(PERCENTAGEGROWTH * 100) + 'percent_pct.png',\
 #                 bbox_inches='tight', dpi=150)
 #     plt.show()
 
-#     # # ### By County
+    # # ### By County
     
-#     for code in standardcountynames:
-#         countysubframe = statesubframe.loc[main["Fips Code"] == code]
-#         tograph = []
+    for code in standardcountynames:
+        county = standardcountynames[code]
+        countystate = standardcountytuples[code][1]
+        if state != countystate:
+            continue
+        countysubframe = statesubframe.loc[statesubframe["StandardCountyName"] == county]
+        if countysubframe.size == 0:
+            continue
+        tograph = fgc_countystatetuplekey[(state, county)]
+        #check cause of this error later!
+        if "Year" in tograph:
+            tograph.remove("Year")
+        if "Total Population" in tograph:
+            tograph.remove("Total Population")
+        if tograph:
+            ## normal plot
+            ax = countysubframe.plot(x = "Year", y = tograph, title = "Denominations in " +\
+                                    county + ", " + state +\
+                                        " with an Increase of at Least "+\
+                                            str(PERCENTAGEGROWTH * 100) +\
+                                            "% Between "+\
+                                        "Two Datapoints"
+                                    , grid = True, ylabel = "Adherents", figsize = (20,8),\
+                                    marker = ".", table = True)
+            ax.xaxis.set_label_position('top') 
+            ax.xaxis.tick_top()
+            ax.legend(loc="upper left",  bbox_to_anchor=(1,1))
+            plt.ticklabel_format(style='plain')  
+            #from https://queirozf.com/entries/matplotlib-examples-number-formatting-for-axes-labels#:~:text=Comma%20as%20thousands%20separator%20Formatting%20labels%20must%20only,with.set_yticklabels%20%28%29%20%28similar%20methods%20exist%20for%20X-axis%20too%29%3A
+            current_values = plt.gca().get_yticks()
+            plt.gca().set_yticklabels(['{:,.0f}'.format(x) for x in current_values])
+            plt.savefig("countyoutputs/by_each_county/" + county+"_"+state + '_IncreaseOf' +\
+                        str(PERCENTAGEGROWTH * 100) + 'percent' + \
+                            "_min" + str(MINSIZEPERCOUNTY)+ '.png',\
+                        bbox_inches='tight', dpi=150)
+            plt.show()
             
-#         for congreg in fgc_countystatetuplekey[(state, standardcountynames[code])]:
-#             countysubframe.rename(columns = {congreg : elimEnding(congreg) +", " + county},\
-#                                   inplace = True)
-#             tograph.append(elimEnding(congreg))
-    
-        
-#         ## normal plot
-#         ax = statesubframe.plot(x = "Year", y = tograph, title = "Denominations in " +\
-#                                 county + ", " + state +\
-#                                     "That Saw an Increase of At Least 50% Between "+\
-#                                     "Two Datapoints"
-#                                 , grid = True, ylabel = "Adherents", figsize = (20,8),\
-#                                 marker = ".", table = True)
-#         ax.xaxis.set_label_position('top') 
-#         ax.xaxis.tick_top()
-#         ax.legend(loc="upper left",  bbox_to_anchor=(1,1))
-#         plt.ticklabel_format(style='plain')  
-#         #from https://queirozf.com/entries/matplotlib-examples-number-formatting-for-axes-labels#:~:text=Comma%20as%20thousands%20separator%20Formatting%20labels%20must%20only,with.set_yticklabels%20%28%29%20%28similar%20methods%20exist%20for%20X-axis%20too%29%3A
-#         current_values = plt.gca().get_yticks()
-#         plt.gca().set_yticklabels(['{:,.0f}'.format(x) for x in current_values])
-#         #plt.legend(loc = "center left")
-#         #table(ax, np.round(statesubframe[tograph].describe(), 2),loc='upper right')
-#         plt.savefig("countyoutputs/by_each_county/" + county+"_"+state + '_IncreaseOf' +\
-#                     str(PERCENTAGEGROWTH * 100) + 'percent.png',\
-#                     bbox_inches='tight', dpi=150)
-#         plt.show()
-        
-#         ## percentage plot
-#         tograph.append("Year")
-#         tograph.append("Total Population")
-#         ssf_pct = statesubframe[tograph]
-        
-#         pct_tograph = []
-#         for col in ssf_pct.columns:
-#             ssf_pct[col + "_pct"] = ssf_pct[col] / ssf_pct["Total Population"]
-#             pct_tograph.append(col + "_pct")
-#         pct_tograph.remove("Total Population_pct")
-#         pct_tograph.remove("Year_pct")
-#         ax = ssf_pct.plot(x = "Year", y = pct_tograph, title = "Denominations in " +\
-#                                 state + "That Saw an Increase of At Least 50% Between "+\
-#                                     "Two Datapoints, as a Percentage"+\
-#                                         " of Total Population of County"\
-#                                 , grid = True, ylabel = "Adherents as % of County's Population",\
-#                                     figsize = (20,8),\
-#                                 marker = ".", table = True)
-#         ax.xaxis.set_label_position('top') 
-#         ax.xaxis.tick_top()
-#         ax.legend(loc="upper left",  bbox_to_anchor=(1,1))
-#         plt.ticklabel_format(style='plain')  
-#         #from https://queirozf.com/entries/matplotlib-examples-number-formatting-for-axes-labels#:~:text=Comma%20as%20thousands%20separator%20Formatting%20labels%20must%20only,with.set_yticklabels%20%28%29%20%28similar%20methods%20exist%20for%20X-axis%20too%29%3A
-#         current_values = plt.gca().get_yticks()
-#         plt.gca().set_yticklabels(['{:,.0%}'.format(x) for x in current_values])
-#         #table(ax, np.round(statesubframe[tograph].describe(), 2),loc='upper right')
-#         plt.savefig("countyoutputs/by_each_county/" + county + "_"+state + '_IncreaseOf' +\
-#                     str(PERCENTAGEGROWTH * 100) + 'percent_pct.png',\
-#                     bbox_inches='tight', dpi=150)
-#         plt.show()
+            ## percentage plot
+            tograph.append("Year")
+            tograph.append("Total Population")
+            ssf_pct = countysubframe[tograph]
+            
+            pct_tograph = []
+            for col in ssf_pct.columns:
+                ssf_pct[col + "_pct"] = ssf_pct[col] / ssf_pct["Total Population"]
+                pct_tograph.append(col + "_pct")
+            pct_tograph.remove("Total Population_pct")
+            pct_tograph.remove("Year_pct")
+            ax = ssf_pct.plot(x = "Year", y = pct_tograph, title = "Denominations in " +\
+                                    county + ", " + state + \
+                                        " with an Increase of at Least "+\
+                                            str(PERCENTAGEGROWTH * 100) +\
+                                            "% Between "+\
+                                        "Two Datapoints, as a Percentage"+\
+                                            " of Total Population of County"\
+                                    , grid = True, ylabel = "Adherents as % of County's Population",\
+                                        figsize = (20,8),\
+                                    marker = ".", table = True)
+            ax.xaxis.set_label_position('top') 
+            ax.xaxis.tick_top()
+            ax.legend(loc="upper left",  bbox_to_anchor=(1,1))
+            plt.ticklabel_format(style='plain')  
+            #from https://queirozf.com/entries/matplotlib-examples-number-formatting-for-axes-labels#:~:text=Comma%20as%20thousands%20separator%20Formatting%20labels%20must%20only,with.set_yticklabels%20%28%29%20%28similar%20methods%20exist%20for%20X-axis%20too%29%3A
+            current_values = plt.gca().get_yticks()
+            plt.gca().set_yticklabels(['{:,.0%}'.format(x) for x in current_values])
+            plt.savefig("countyoutputs/by_each_county/" + county + "_"+state + '_IncreaseOf' +\
+                        str(PERCENTAGEGROWTH * 100) + 'percent_' +\
+                            "min" + str(MINSIZEPERCOUNTY) + '_pct.png',\
+                        bbox_inches='tight', dpi=150)
+            plt.show()
 
 # ---------------------------- extra code
 
