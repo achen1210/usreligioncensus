@@ -4373,7 +4373,7 @@ statecodes = {'AK': {'code': 'AK', 'name': 'Alaska', 'fips': '02', 'geonameid': 
 #changes state abbreviation to non-abbreviation for ease of use
 for code in standardcountytuples:
     county, stateabr = standardcountytuples[code]
-    standardcountytuples[code] = (county, statecodes[stateabr])
+    standardcountytuples[code] = (county, statecodes[stateabr]["name"])
 
 standardcountynames = {}
 for code in standardcountytuples:
@@ -4464,143 +4464,144 @@ for code in standardcountynames:
     thiscounty = main.loc[main["Fips Code"] == code]
     countyname = standardcountynames[code]
     for col in thiscounty.columns:
-        for val in thiscounty[col].pct_change():
-            if val >= PERCENTAGEGROWTH:
-                state = standardcountytuples[code][1]
-                congregname = col
-                county = countyname
-                fgc_statekey[state].append((congregname, county))
-                fgc_countystatetuplekey[(state, county)].append(congregname)
-                break
+        if col not in identifiercols:
+            for val in thiscounty[col].pct_change():
+                if val >= PERCENTAGEGROWTH:
+                    state = standardcountytuples[code][1]
+                    congregname = col
+                    county = countyname
+                    fgc_statekey[state].append((congregname, county))
+                    fgc_countystatetuplekey[(state, county)].append(congregname)
+                    break
 
 
 ################## GRAPHS ################
 
-for state in USstates:
-    ### State with County Names
-    statesubframe = main.loc[main["State Name"] == state]
-    tograph = []
+# for state in USstates:
+#     ### State with County Names
+#     statesubframe = main.loc[main["State Name"] == state]
+#     tograph = []
         
-    for congreg, county in fgc_statekey[state]:
-        statesubframe.rename(columns = {congreg : elimEnding(congreg) +", " + county},\
-                             inplace = True)
-        tograph.append(elimEnding(congreg) +", " + county)
+#     for congreg, county in fgc_statekey[state]:
+#         statesubframe.rename(columns = {congreg : elimEnding(congreg) +", " + county},\
+#                              inplace = True)
+#         tograph.append(elimEnding(congreg) +", " + county)
 
     
-    ## normal plot
-    ax = statesubframe.plot(x = "Year", y = tograph, title = "Denominations in " +\
-                            state + "That Saw an Increase of At Least 50% Between "+\
-                                "Two Datapoints"
-                            , grid = True, ylabel = "Adherents", figsize = (20,8),\
-                            marker = ".", table = True)
-    ax.xaxis.set_label_position('top') 
-    ax.xaxis.tick_top()
-    ax.legend(loc="upper left",  bbox_to_anchor=(1,1))
-    plt.ticklabel_format(style='plain')  
-    #from https://queirozf.com/entries/matplotlib-examples-number-formatting-for-axes-labels#:~:text=Comma%20as%20thousands%20separator%20Formatting%20labels%20must%20only,with.set_yticklabels%20%28%29%20%28similar%20methods%20exist%20for%20X-axis%20too%29%3A
-    current_values = plt.gca().get_yticks()
-    plt.gca().set_yticklabels(['{:,.0f}'.format(x) for x in current_values])
-    #plt.legend(loc = "center left")
-    #table(ax, np.round(statesubframe[tograph].describe(), 2),loc='upper right')
-    plt.savefig("countyoutputs/by_each_state/" + state + '_IncreaseOf' +\
-                str(PERCENTAGEGROWTH * 100) + 'percent.png',\
-                bbox_inches='tight', dpi=150)
-    plt.show()
+#     ## normal plot
+#     ax = statesubframe.plot(x = "Year", y = tograph, title = "Denominations in " +\
+#                             state + "That Saw an Increase of At Least 50% Between "+\
+#                                 "Two Datapoints"
+#                             , grid = True, ylabel = "Adherents", figsize = (20,8),\
+#                             marker = ".", table = True)
+#     ax.xaxis.set_label_position('top') 
+#     ax.xaxis.tick_top()
+#     ax.legend(loc="upper left",  bbox_to_anchor=(1,1))
+#     plt.ticklabel_format(style='plain')  
+#     #from https://queirozf.com/entries/matplotlib-examples-number-formatting-for-axes-labels#:~:text=Comma%20as%20thousands%20separator%20Formatting%20labels%20must%20only,with.set_yticklabels%20%28%29%20%28similar%20methods%20exist%20for%20X-axis%20too%29%3A
+#     current_values = plt.gca().get_yticks()
+#     plt.gca().set_yticklabels(['{:,.0f}'.format(x) for x in current_values])
+#     #plt.legend(loc = "center left")
+#     #table(ax, np.round(statesubframe[tograph].describe(), 2),loc='upper right')
+#     plt.savefig("countyoutputs/by_each_state/" + state + '_IncreaseOf' +\
+#                 str(PERCENTAGEGROWTH * 100) + 'percent.png',\
+#                 bbox_inches='tight', dpi=150)
+#     plt.show()
     
-    ## percentage plot
-    tograph.append("Year")
-    tograph.append("Total Population")
-    ssf_pct = statesubframe[tograph]
+#     ## percentage plot
+#     tograph.append("Year")
+#     tograph.append("Total Population")
+#     ssf_pct = statesubframe[tograph]
     
-    pct_tograph = []
-    for col in ssf_pct.columns:
-        ssf_pct[col + "_pct"] = ssf_pct[col] / ssf_pct["Total Population"]
-        pct_tograph.append(col + "_pct")
-    pct_tograph.remove("Total Population_pct")
-    pct_tograph.remove("Year_pct")
-    ax = ssf_pct.plot(x = "Year", y = pct_tograph, title = "Denominations in " +\
-                            state + "That Saw an Increase of At Least 50% Between "+\
-                                "Two Datapoints, as a Percentage"+\
-                                    " of Total Population of Thier County"\
-                            , grid = True, ylabel = "Adherents as % of County's Population",\
-                                figsize = (20,8),\
-                            marker = ".", table = True)
-    ax.xaxis.set_label_position('top') 
-    ax.xaxis.tick_top()
-    ax.legend(loc="upper left",  bbox_to_anchor=(1,1))
-    plt.ticklabel_format(style='plain')  
-    #from https://queirozf.com/entries/matplotlib-examples-number-formatting-for-axes-labels#:~:text=Comma%20as%20thousands%20separator%20Formatting%20labels%20must%20only,with.set_yticklabels%20%28%29%20%28similar%20methods%20exist%20for%20X-axis%20too%29%3A
-    current_values = plt.gca().get_yticks()
-    plt.gca().set_yticklabels(['{:,.0%}'.format(x) for x in current_values])
-    #table(ax, np.round(statesubframe[tograph].describe(), 2),loc='upper right')
-    plt.savefig("countyoutputs/by_each_state/" + state + '_IncreaseOf' +\
-                str(PERCENTAGEGROWTH * 100) + 'percent_pct.png',\
-                bbox_inches='tight', dpi=150)
-    plt.show()
+#     pct_tograph = []
+#     for col in ssf_pct.columns:
+#         ssf_pct[col + "_pct"] = ssf_pct[col] / ssf_pct["Total Population"]
+#         pct_tograph.append(col + "_pct")
+#     pct_tograph.remove("Total Population_pct")
+#     pct_tograph.remove("Year_pct")
+#     ax = ssf_pct.plot(x = "Year", y = pct_tograph, title = "Denominations in " +\
+#                             state + "That Saw an Increase of At Least 50% Between "+\
+#                                 "Two Datapoints, as a Percentage"+\
+#                                     " of Total Population of Thier County"\
+#                             , grid = True, ylabel = "Adherents as % of County's Population",\
+#                                 figsize = (20,8),\
+#                             marker = ".", table = True)
+#     ax.xaxis.set_label_position('top') 
+#     ax.xaxis.tick_top()
+#     ax.legend(loc="upper left",  bbox_to_anchor=(1,1))
+#     plt.ticklabel_format(style='plain')  
+#     #from https://queirozf.com/entries/matplotlib-examples-number-formatting-for-axes-labels#:~:text=Comma%20as%20thousands%20separator%20Formatting%20labels%20must%20only,with.set_yticklabels%20%28%29%20%28similar%20methods%20exist%20for%20X-axis%20too%29%3A
+#     current_values = plt.gca().get_yticks()
+#     plt.gca().set_yticklabels(['{:,.0%}'.format(x) for x in current_values])
+#     #table(ax, np.round(statesubframe[tograph].describe(), 2),loc='upper right')
+#     plt.savefig("countyoutputs/by_each_state/" + state + '_IncreaseOf' +\
+#                 str(PERCENTAGEGROWTH * 100) + 'percent_pct.png',\
+#                 bbox_inches='tight', dpi=150)
+#     plt.show()
 
-    # # ### By County
+#     # # ### By County
     
-    for code in standardcountynames:
-        countysubframe = statesubframe.loc[main["Fips Code"] == code]
-        tograph = []
+#     for code in standardcountynames:
+#         countysubframe = statesubframe.loc[main["Fips Code"] == code]
+#         tograph = []
             
-        for congreg in fgc_countystatetuplekey[(state, standardcountynames[code])]:
-            countysubframe.rename(columns = {congreg : elimEnding(congreg) +", " + county},\
-                                  inplace = True)
-            tograph.append(elimEnding(congreg))
+#         for congreg in fgc_countystatetuplekey[(state, standardcountynames[code])]:
+#             countysubframe.rename(columns = {congreg : elimEnding(congreg) +", " + county},\
+#                                   inplace = True)
+#             tograph.append(elimEnding(congreg))
     
         
-        ## normal plot
-        ax = statesubframe.plot(x = "Year", y = tograph, title = "Denominations in " +\
-                                county + ", " + state +\
-                                    "That Saw an Increase of At Least 50% Between "+\
-                                    "Two Datapoints"
-                                , grid = True, ylabel = "Adherents", figsize = (20,8),\
-                                marker = ".", table = True)
-        ax.xaxis.set_label_position('top') 
-        ax.xaxis.tick_top()
-        ax.legend(loc="upper left",  bbox_to_anchor=(1,1))
-        plt.ticklabel_format(style='plain')  
-        #from https://queirozf.com/entries/matplotlib-examples-number-formatting-for-axes-labels#:~:text=Comma%20as%20thousands%20separator%20Formatting%20labels%20must%20only,with.set_yticklabels%20%28%29%20%28similar%20methods%20exist%20for%20X-axis%20too%29%3A
-        current_values = plt.gca().get_yticks()
-        plt.gca().set_yticklabels(['{:,.0f}'.format(x) for x in current_values])
-        #plt.legend(loc = "center left")
-        #table(ax, np.round(statesubframe[tograph].describe(), 2),loc='upper right')
-        plt.savefig("countyoutputs/by_each_county/" + county+"_"+state + '_IncreaseOf' +\
-                    str(PERCENTAGEGROWTH * 100) + 'percent.png',\
-                    bbox_inches='tight', dpi=150)
-        plt.show()
+#         ## normal plot
+#         ax = statesubframe.plot(x = "Year", y = tograph, title = "Denominations in " +\
+#                                 county + ", " + state +\
+#                                     "That Saw an Increase of At Least 50% Between "+\
+#                                     "Two Datapoints"
+#                                 , grid = True, ylabel = "Adherents", figsize = (20,8),\
+#                                 marker = ".", table = True)
+#         ax.xaxis.set_label_position('top') 
+#         ax.xaxis.tick_top()
+#         ax.legend(loc="upper left",  bbox_to_anchor=(1,1))
+#         plt.ticklabel_format(style='plain')  
+#         #from https://queirozf.com/entries/matplotlib-examples-number-formatting-for-axes-labels#:~:text=Comma%20as%20thousands%20separator%20Formatting%20labels%20must%20only,with.set_yticklabels%20%28%29%20%28similar%20methods%20exist%20for%20X-axis%20too%29%3A
+#         current_values = plt.gca().get_yticks()
+#         plt.gca().set_yticklabels(['{:,.0f}'.format(x) for x in current_values])
+#         #plt.legend(loc = "center left")
+#         #table(ax, np.round(statesubframe[tograph].describe(), 2),loc='upper right')
+#         plt.savefig("countyoutputs/by_each_county/" + county+"_"+state + '_IncreaseOf' +\
+#                     str(PERCENTAGEGROWTH * 100) + 'percent.png',\
+#                     bbox_inches='tight', dpi=150)
+#         plt.show()
         
-        ## percentage plot
-        tograph.append("Year")
-        tograph.append("Total Population")
-        ssf_pct = statesubframe[tograph]
+#         ## percentage plot
+#         tograph.append("Year")
+#         tograph.append("Total Population")
+#         ssf_pct = statesubframe[tograph]
         
-        pct_tograph = []
-        for col in ssf_pct.columns:
-            ssf_pct[col + "_pct"] = ssf_pct[col] / ssf_pct["Total Population"]
-            pct_tograph.append(col + "_pct")
-        pct_tograph.remove("Total Population_pct")
-        pct_tograph.remove("Year_pct")
-        ax = ssf_pct.plot(x = "Year", y = pct_tograph, title = "Denominations in " +\
-                                state + "That Saw an Increase of At Least 50% Between "+\
-                                    "Two Datapoints, as a Percentage"+\
-                                        " of Total Population of County"\
-                                , grid = True, ylabel = "Adherents as % of County's Population",\
-                                    figsize = (20,8),\
-                                marker = ".", table = True)
-        ax.xaxis.set_label_position('top') 
-        ax.xaxis.tick_top()
-        ax.legend(loc="upper left",  bbox_to_anchor=(1,1))
-        plt.ticklabel_format(style='plain')  
-        #from https://queirozf.com/entries/matplotlib-examples-number-formatting-for-axes-labels#:~:text=Comma%20as%20thousands%20separator%20Formatting%20labels%20must%20only,with.set_yticklabels%20%28%29%20%28similar%20methods%20exist%20for%20X-axis%20too%29%3A
-        current_values = plt.gca().get_yticks()
-        plt.gca().set_yticklabels(['{:,.0%}'.format(x) for x in current_values])
-        #table(ax, np.round(statesubframe[tograph].describe(), 2),loc='upper right')
-        plt.savefig("countyoutputs/by_each_county/" + county + "_"+state + '_IncreaseOf' +\
-                    str(PERCENTAGEGROWTH * 100) + 'percent_pct.png',\
-                    bbox_inches='tight', dpi=150)
-        plt.show()
+#         pct_tograph = []
+#         for col in ssf_pct.columns:
+#             ssf_pct[col + "_pct"] = ssf_pct[col] / ssf_pct["Total Population"]
+#             pct_tograph.append(col + "_pct")
+#         pct_tograph.remove("Total Population_pct")
+#         pct_tograph.remove("Year_pct")
+#         ax = ssf_pct.plot(x = "Year", y = pct_tograph, title = "Denominations in " +\
+#                                 state + "That Saw an Increase of At Least 50% Between "+\
+#                                     "Two Datapoints, as a Percentage"+\
+#                                         " of Total Population of County"\
+#                                 , grid = True, ylabel = "Adherents as % of County's Population",\
+#                                     figsize = (20,8),\
+#                                 marker = ".", table = True)
+#         ax.xaxis.set_label_position('top') 
+#         ax.xaxis.tick_top()
+#         ax.legend(loc="upper left",  bbox_to_anchor=(1,1))
+#         plt.ticklabel_format(style='plain')  
+#         #from https://queirozf.com/entries/matplotlib-examples-number-formatting-for-axes-labels#:~:text=Comma%20as%20thousands%20separator%20Formatting%20labels%20must%20only,with.set_yticklabels%20%28%29%20%28similar%20methods%20exist%20for%20X-axis%20too%29%3A
+#         current_values = plt.gca().get_yticks()
+#         plt.gca().set_yticklabels(['{:,.0%}'.format(x) for x in current_values])
+#         #table(ax, np.round(statesubframe[tograph].describe(), 2),loc='upper right')
+#         plt.savefig("countyoutputs/by_each_county/" + county + "_"+state + '_IncreaseOf' +\
+#                     str(PERCENTAGEGROWTH * 100) + 'percent_pct.png',\
+#                     bbox_inches='tight', dpi=150)
+#         plt.show()
 
 # ---------------------------- extra code
 
